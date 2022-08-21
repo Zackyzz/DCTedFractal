@@ -3,7 +3,7 @@
 (require "DCT.rkt")
 
 (define SIZE 512)
-(define N-size 4)
+(define N-size 16)
 (define TL 8)
 (define n (sqr TL))
 
@@ -27,6 +27,8 @@
          (for/vector ([b (in-range j (+ j size))])
            (matrix-get matrix a b)))))))
 
+;----------------------------------ENCODER------------------------------------------------
+
 (define (get-ranges matrix [nr (/ SIZE TL)] [size TL] [step TL])
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
@@ -37,7 +39,7 @@
           (for/vector ([a (in-range i (+ i size))])
             (for/vector ([b (in-range j (+ j size))])
               (matrix-get matrix a b)))))
-        (random 0 1024))))))
+        (random 1024))))))
 
 (define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
   (matrix->list
@@ -55,15 +57,16 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (define ldomain (flatten-matrix (list-ref domains (second range))))
-  (define lrange (flatten-matrix (first range)))
+  (define ldomain (list-ref domains (second range)))
+  (define lrange (first range))
   (define delta (map - lrange ldomain))
   (list (second range) delta))
 
-(define (search-ranges ranges domains [p-gauge #f])
+(define (search-ranges ranges domains)
   (for/list ([i ranges])
-    (when p-gauge (send p-gauge set-value (add1 (send p-gauge get-value))))
     (search-range i domains)))
+
+;----------------------------------DECODER------------------------------------------------
 
 (define (get-decoding-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
   (matrix->list
@@ -83,12 +86,8 @@
 (define (decode founds new-domains)
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds])
-    (define domain (flatten-matrix (vector-ref new-domains (first i))))
+    (define domain (vector-ref new-domains (first i)))
     (define dc-DCT (map + domain (second i)))
-    (set! dc-DCT
-          (for/vector ([i N-size])
-            (for/vector ([j N-size])
-              (list-ref dc-DCT (+ j (* i N-size))))))
     (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
@@ -101,19 +100,36 @@
         (matrix-set new-matrix (+ (* TL row) i) (+ (* TL column) j) (exact-floor (matrix-get block i j))))))
   new-matrix)
 
+;----------------------------------ZIG-ZAG------------------------------------------------
+
+(define/match (compare i j)
+  [((list x y) (list a b)) (or (< x a) (and (= x a) (< y b)))])
+ 
+(define/match (key i)
+  [((list x y)) (list (+ x y) (if (even? (+ x y)) (- y) y))])
+ 
+(define (zigzag-ht n)
+  (define indexorder
+    (sort (for*/list ([x n] [y n]) (list x y))
+          compare #:key key))
+  (for/hash ([(n i) (in-indexed indexorder)]) (values n i)))
+ 
+(define (zigzag n)
+  (define ht (zigzag-ht n))
+  (for/list ([x n]) 
+    (for/list ([y n])
+      (hash-ref ht (list x y)))))
+
+(define read-order
+  (for/list ([i 64])
+    (index-of (apply append (zigzag 8)) i)))
+
 (define (crop-block block [size N-size])
-  (for/vector ([i size])
-    (for/vector ([j size])
-      (matrix-get block i j))))
-
-(define (padd-block block [size N-size])
+  (for/list ([i (take read-order size)])
+    (matrix-get block (quotient i 8) (remainder i 8))))
+    
+(define (padd-block coefs)
   (define new-matrix (for/vector ([i 8]) (make-vector 8)))
-  (for ([i size])
-    (for ([j size])
-      (matrix-set new-matrix i j (matrix-get block i j))))
+  (for ([i coefs] [j (take read-order (length coefs))])
+    (matrix-set new-matrix (quotient j 8) (remainder j 8) i))
   new-matrix)
-
-(define (list->matrix lst)
-  (for/vector ([i 8])
-    (for/vector ([j 8])
-      (list-ref lst (+ j (* i 8))))))

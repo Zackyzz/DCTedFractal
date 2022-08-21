@@ -12,7 +12,7 @@
   (new frame%
        [label "Fractal Coding"]
        [x 250] [y 150]
-       [width 1150] [height 700]))
+       [width 1150] [height 670]))
 
 (send frame show #t)
 
@@ -38,13 +38,6 @@
        [paint-callback
         (λ (canvas dc)
           (send dc draw-bitmap encode-bitmap 20 20))]))
-
-(define gauge-process
-  (new gauge%
-       [parent encode-panel]
-       [label ""]
-       [range 2048]
-       [horiz-margin 100]))
 
 (define ranges #f)
 (define domains #f)
@@ -75,12 +68,8 @@
        [callback
         (λ (button event)
           (when (and ranges domains)
-            (time
-             (set! founds
-                   (let ([f (future (λ() (search-ranges (drop ranges 2048) domains)))])
-                     (apply append (list (search-ranges (take ranges 2048) domains gauge-process)
-                                         (touch f))))))))]))
-
+            (time (set! founds (search-ranges ranges domains)))))]))
+                   
 ;------------------------------------DECODE PANEL----------------------------------------
 
 (define decode-panel
@@ -112,8 +101,8 @@
              (define blocks (decode founds (get-decoding-domains final-matrix)))
              (set! final-matrix (blocks->image-matrix blocks)))))]))
 
-(define (normalize x)
-  (set! x (exact-round (+ 120 x)))
+(define (normalize x bias)
+  (set! x (exact-round (+ bias x)))
   (cond [(< x 0) 0] [(> x 255) 255] [else x]))
 
 (define (matrix->bytes matrix)
@@ -127,10 +116,11 @@
         (λ (button event)
           (time
            (when final-matrix
+             (define bias (- (mean original-matrix) (mean final-matrix)))
              (define refinal-matrix
                (for/vector ([i SIZE])
                  (for/vector ([j SIZE])
-                   (normalize (matrix-get final-matrix i j)))))
+                   (normalize (matrix-get final-matrix i j) bias))))
              (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
              (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
              (send decode-canvas on-paint))))]))
@@ -149,3 +139,7 @@
        [label "PSNR:"]
        [horiz-margin 150]
        [init-value ""]))
+
+(define (mean m)
+  (define x (flatten-matrix m))
+  (exact->inexact (/ (apply + x) (length x))))
