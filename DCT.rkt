@@ -1,0 +1,71 @@
+#lang racket
+(provide DCT IDCT)
+
+(define (shift- vec)
+  (vector-map (λ(x) (- x 128)) vec))
+
+(define (shift+ vec)
+  (vector-map (λ(x) (+ x 128)) vec))
+
+(define (matrix-get matrix i j)
+  (vector-ref (vector-ref matrix i) j))
+
+(define (list->matrix lst)
+  (for/vector ([i 8])
+    (for/vector ([j 8])
+      (list-ref lst (+ j (* i 8))))))
+
+(define (DCT-pixel block i j)
+  (define Ci (if (= i 0) (/ 1 (sqrt 2)) 1))
+  (define Cj (if (= j 0) (/ 1 (sqrt 2)) 1))
+  (define sum 0)
+  (for ([x 8])
+    (for ([y 8])
+      (set! sum (+ sum (* (matrix-get block x y)
+                          (cos (/ (* (+ 1 (* 2 x)) i pi) 16))
+                          (cos (/ (* (+ 1 (* 2 y)) j pi) 16)))))))
+  (* sum 0.25 Ci Cj))
+
+(define (DCT block)
+  (set! block (vector-map shift- block))
+  (define dcted (for/vector ([i 8])
+                  (for/vector ([j 8])
+                    (DCT-pixel block i j))))
+  (quantize dcted))
+
+(define (IDCT-pixel block x y)
+  (define sum 0)
+  (for ([i 8])
+    (for ([j 8])
+      (define Ci (if (= i 0) (/ 1 (sqrt 2)) 1))
+      (define Cj (if (= j 0) (/ 1 (sqrt 2)) 1))
+      (set! sum (+ sum (* Ci Cj (matrix-get block i j)
+                          (cos (/ (* (+ 1 (* 2 x)) i pi) 16))
+                          (cos (/ (* (+ 1 (* 2 y)) j pi) 16)))))))
+  (* sum 0.25))
+
+(define (IDCT block)
+  (set! block (dequantize block))
+  (vector-map shift+
+              (for/vector ([i 8])
+                (for/vector ([j 8])
+                  (exact-round (IDCT-pixel block i j))))))
+
+(define q-table (vector (vector 16 11 10 16 24 40 51 61)
+                        (vector 12 12 14 19 26 58 60 55)
+                        (vector 14 13 16 24 40 57 69 56)
+                        (vector 14 17 22 29 51 87 80 62)
+                        (vector 18 22 37 56 68 109 103 77)
+                        (vector 24 35 55 64 81 104 113 92)
+                        (vector 49 64 78 87 103 121 120 101)
+                        (vector 72 92 95 98 112 100 103 99)))
+
+(define (quantize block)
+  (for/vector ([i 8])
+    (for/vector ([j 8])
+      (exact-round (/ (matrix-get block i j) (matrix-get q-table i j))))))
+
+(define (dequantize block)
+  (for/vector ([i 8])
+    (for/vector ([j 8])
+      (* (matrix-get block i j) (matrix-get q-table i j)))))
