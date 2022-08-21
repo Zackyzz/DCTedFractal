@@ -1,5 +1,5 @@
 #lang racket/gui
-(require "Chaos.rkt")
+(require "DCT.rkt" "Chaos.rkt")
 
 (define (get-matrix buffer)
   (for/vector ([i SIZE])
@@ -109,12 +109,11 @@
         (λ (button event)
           (time
            (when founds
-             (for ([i 10])
-               (define blocks (decode founds (get-decoding-domains final-matrix)))
-               (set! final-matrix (blocks->image-matrix blocks))))))]))
+             (define blocks (decode founds (get-decoding-domains final-matrix)))
+             (set! final-matrix (blocks->image-matrix blocks)))))]))
 
 (define (normalize x)
-  (set! x (+ 120 (exact-round x)))
+  (set! x (exact-round (+ 120 x)))
   (cond [(< x 0) 0] [(> x 255) 255] [else x]))
 
 (define (matrix->bytes matrix)

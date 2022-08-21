@@ -5,51 +5,30 @@
   (vector-map (λ(x) (- x 128)) vec))
 
 (define (shift+ vec)
-  (vector-map (λ(x) (+ x 128)) vec))
+  (vector-map (λ(x) (+ (exact-round x) 128)) vec))
 
 (define (matrix-get matrix i j)
   (vector-ref (vector-ref matrix i) j))
 
-(define (list->matrix lst)
+(define T
   (for/vector ([i 8])
     (for/vector ([j 8])
-      (list-ref lst (+ j (* i 8))))))
+      (if (= i 0)
+          (/ 1.0 (sqrt 8))
+          (* 0.5 (cos (/ (* (+ 1 (* 2 j)) i pi) 16)))))))
 
-(define (DCT-pixel block i j)
-  (define Ci (if (= i 0) (/ 1 (sqrt 2)) 1))
-  (define Cj (if (= j 0) (/ 1 (sqrt 2)) 1))
-  (define sum 0)
-  (for ([x 8])
-    (for ([y 8])
-      (set! sum (+ sum (* (matrix-get block x y)
-                          (cos (/ (* (+ 1 (* 2 x)) i pi) 16))
-                          (cos (/ (* (+ 1 (* 2 y)) j pi) 16)))))))
-  (* sum 0.25 Ci Cj))
+(define (lm->mm m) (list->vector (map list->vector m)))
+(define (mm->lm m) (vector->list (vector-map vector->list m)))
 
-(define (DCT block)
-  (set! block (vector-map shift- block))
-  (define dcted (for/vector ([i 8])
-                  (for/vector ([j 8])
-                    (DCT-pixel block i j))))
-  (quantize dcted))
+(define (mult m1 m2)
+  (set! m1 (mm->lm m1))
+  (set! m2 (mm->lm m2))
+  (lm->mm
+   (for/list ([r m1])
+     (for/list ([c (apply map list m2)])
+       (apply + (map * r c))))))
 
-(define (IDCT-pixel block x y)
-  (define sum 0)
-  (for ([i 8])
-    (for ([j 8])
-      (define Ci (if (= i 0) (/ 1 (sqrt 2)) 1))
-      (define Cj (if (= j 0) (/ 1 (sqrt 2)) 1))
-      (set! sum (+ sum (* Ci Cj (matrix-get block i j)
-                          (cos (/ (* (+ 1 (* 2 x)) i pi) 16))
-                          (cos (/ (* (+ 1 (* 2 y)) j pi) 16)))))))
-  (* sum 0.25))
-
-(define (IDCT block)
-  (set! block (dequantize block))
-  (vector-map shift+
-              (for/vector ([i 8])
-                (for/vector ([j 8])
-                  (exact-round (IDCT-pixel block i j))))))
+(define (transpose m) (lm->mm (apply map list (mm->lm m))))
 
 (define q-table (vector (vector 16 11 10 16 24 40 51 61)
                         (vector 12 12 14 19 26 58 60 55)
@@ -69,3 +48,6 @@
   (for/vector ([i 8])
     (for/vector ([j 8])
       (* (matrix-get block i j) (matrix-get q-table i j)))))
+
+(define (DCT block) (quantize (mult (mult T (vector-map shift- block)) (transpose T))))
+(define (IDCT block) (vector-map shift+ (mult (mult (transpose T) (dequantize block)) T)))
