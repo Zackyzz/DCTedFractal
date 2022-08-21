@@ -1,8 +1,9 @@
 #lang racket
 (provide (all-defined-out))
+(require "DCT.rkt")
 
 (define SIZE 512)
-(define N-size 2)
+(define N-size 4)
 (define TL 8)
 (define n (sqr TL))
 
@@ -33,12 +34,16 @@
        (define sum 0)
        (define sum^2 0)
        (define block
-         (for/vector ([a (in-range i (+ i size))])
-           (for/vector ([b (in-range j (+ j size))])
-             (define bi (matrix-get matrix a b))
-             (set! sum (+ sum bi))
-             (set! sum^2 (+ sum^2 (sqr bi)))
-             bi)))
+         (crop-block
+          (DCT
+           (for/vector ([a (in-range i (+ i size))])
+             (for/vector ([b (in-range j (+ j size))])
+               (matrix-get matrix a b))))))
+       (for ([a N-size])
+         (for ([b N-size])
+           (define bi (matrix-get block a b))
+           (set! sum (+ sum bi))
+           (set! sum^2 (+ sum^2 (sqr bi)))))
        (list block sum sum^2)))))
 
 (define (get-domains matrix [nr (sub1 (/ SIZE TL))] [size (* 2 TL)] [step TL])
@@ -48,27 +53,30 @@
        (define sum 0)
        (define sum^2 0)
        (define block
-         (for/vector ([a (in-range TL)])
-           (for/vector ([b (in-range TL)])
-             (define bi
+         (crop-block
+          (DCT
+           (for/vector ([a (in-range TL)])
+             (for/vector ([b (in-range TL)])
                (quotient (exact-round
                           (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
                              (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
                              (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
                              (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
-                         4))
-             (set! sum (+ sum bi))
-             (set! sum^2 (+ sum^2 (sqr bi)))
-             bi)))
+                         4))))))
+       (for ([a N-size])
+         (for ([b N-size])
+           (define bi (matrix-get block a b))
+           (set! sum (+ sum bi))
+           (set! sum^2 (+ sum^2 (sqr bi)))))
        (list block sum sum^2)))))
 
 (define (search-range lrange domains)
   (define range (first lrange))
   (define sum-r (second lrange))
   (define sum-r^2 (third lrange))
-  (let loop ([error (expt 2 30)] [index 0] [S 0] [O 0] [domains domains] [it 0])
+  (let loop ([error (expt 2 30)] [index 0] [S 0] [O 0] [q '()] [domains domains] [it 0])
     [cond
-      [(empty? domains) (list index (exact->inexact S) (exact->inexact O))]
+      [(empty? domains) (list index (exact->inexact S) (exact->inexact O) (exact->inexact error) q)]
       [else
        (define domain (caar domains))
        (define sum-d (cadar domains))
@@ -82,8 +90,8 @@
                         (* s (+ (* s sum-d^2) (- (* 2 sum-rd)) (* 2 o sum-d)))
                         (* o (- (* o n) (* 2 sum-r)))))
        (if (< Error error)
-           (loop Error it s o (rest domains) (add1 it))
-           (loop error index S O (rest domains) (add1 it)))]]))
+           (loop Error it s o (map - (flatten-matrix range) (flatten-matrix domain)) (rest domains) (add1 it))
+           (loop error index S O q (rest domains) (add1 it)))]]))
 
 (define (search-ranges ranges domains [p-gauge #f])
   (for/list ([i ranges])
@@ -94,24 +102,28 @@
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
-       (for/vector ([a (in-range TL)])
-         (for/vector ([b (in-range TL)])
-           (quotient (exact-round
-                      (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
-                         (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
-                         (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
-                         (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
-                     4)))))))
+       (crop-block
+        (DCT
+         (for/vector ([a (in-range TL)])
+           (for/vector ([b (in-range TL)])
+             (quotient (exact-round
+                        (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
+                           (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
+                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
+                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
+                       4)))))))))
 
 (define (decode founds new-domains)
   (set! new-domains (list->vector new-domains))
   (for/vector ([i founds])
     (define domain (vector-ref new-domains (first i)))
-    (define s (second i))
-    (define o (third i))
-    (for/vector ([i TL])
-      (for/vector ([j TL])
-        (+ o (* s (matrix-get domain i j)))))))
+    (define vec (fifth i))
+    (define dc-DCT (map + vec (flatten-matrix domain)))
+    (set! dc-DCT
+          (for/vector ([i N-size])
+            (for/vector ([j N-size])
+              (list-ref dc-DCT (+ j (* i N-size))))))
+    (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
   (define new-matrix (for/vector ([i SIZE]) (make-vector SIZE)))

@@ -1,5 +1,5 @@
 #lang racket/gui
-(require "DCT.rkt" "Chaos.rkt")
+(require "Chaos.rkt")
 
 (define (get-matrix buffer)
   (for/vector ([i SIZE])
@@ -58,13 +58,14 @@
        [callback
         (λ (button event)
           (define path (get-file #f #f "../Chaos/utils" #f #f null))
-          (when path
-            (set! encode-bitmap (read-bitmap path))
-            (send encode-canvas on-paint)
-            (send encode-bitmap get-argb-pixels 0 0 SIZE SIZE encode-buffer)
-            (set! original-matrix (get-matrix encode-buffer))
-            (set! ranges (get-ranges original-matrix))
-            (set! domains (get-domains original-matrix))))]))
+          (time
+           (when path
+             (set! encode-bitmap (read-bitmap path))
+             (send encode-canvas on-paint)
+             (send encode-bitmap get-argb-pixels 0 0 SIZE SIZE encode-buffer)
+             (set! original-matrix (get-matrix encode-buffer))
+             (set! ranges (get-ranges original-matrix))
+             (set! domains (get-domains original-matrix)))))]))
 
 (define founds #f)
 (define process-button
@@ -108,11 +109,12 @@
         (λ (button event)
           (time
            (when founds
-             (define blocks (decode founds (get-decoding-domains final-matrix)))
-             (set! final-matrix (blocks->image-matrix blocks)))))]))
+             (for ([i 10])
+               (define blocks (decode founds (get-decoding-domains final-matrix)))
+               (set! final-matrix (blocks->image-matrix blocks))))))]))
 
 (define (normalize x)
-  (set! x (exact-round x))
+  (set! x (+ 120 (exact-round x)))
   (cond [(< x 0) 0] [(> x 255) 255] [else x]))
 
 (define (matrix->bytes matrix)
@@ -126,12 +128,12 @@
         (λ (button event)
           (time
            (when final-matrix
-             (set! final-matrix
-                   (for/vector ([i SIZE])
-                     (for/vector ([j SIZE])
-                       (normalize (matrix-get final-matrix i j)))))
-             (send psnr-field set-value (number->string (PSNR original-matrix final-matrix)))
-             (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes final-matrix))
+             (define refinal-matrix
+               (for/vector ([i SIZE])
+                 (for/vector ([j SIZE])
+                   (normalize (matrix-get final-matrix i j)))))
+             (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
+             (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
              (send decode-canvas on-paint))))]))
 
 (define (PSNR original decoded)
