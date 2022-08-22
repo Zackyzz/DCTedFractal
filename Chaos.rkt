@@ -30,18 +30,16 @@
 ;----------------------------------ENCODER------------------------------------------------
 
 (define (get-ranges matrix [nr (/ SIZE TL)] [size TL] [step TL])
-  (map list
-       (matrix->list
-        (for/list ([i (in-range 0 (* nr step) step)])
-          (for/list ([j (in-range 0 (* nr step) step)])
-            (crop-block
-             (DCT
-              (for/vector ([a (in-range i (+ i size))])
-                (for/vector ([b (in-range j (+ j size))])
-                  (matrix-get matrix a b))))))))
-       (build-list 4096 (λ _ (random 3969)))))
+  (matrix->list
+   (for/list ([i (in-range 0 (* nr step) step)])
+     (for/list ([j (in-range 0 (* nr step) step)])
+       (crop-block
+        (DCT
+         (for/vector ([a (in-range i (+ i size))])
+           (for/vector ([b (in-range j (+ j size))])
+             (matrix-get matrix a b)))))))))
 
-(define (get-domains matrix [nr (sub1 (/ SIZE TL))] [size (* 2 TL)] [step TL])
+(define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
@@ -57,10 +55,20 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (define ldomain (vector-ref (list->vector domains) (second range)))
-  (define lrange (first range))
+  (let loop ([error (expt 2 30)] [index 0] [it 0] [delta '()] [domains domains])
+    (cond
+      [(empty? domains) (list index delta)]
+      [else
+       (define new-error (apply + (map (λ(x y) (abs (- x y))) (cdr range) (cdar domains))))
+       (if (< new-error error)
+           (loop new-error it (add1 it) (map - range (car domains)) (rest domains))
+           (loop error index (add1 it) delta (rest domains)))])))
+
+#|(define (search-range range domains)
+  (define ldomain (vector-ref (list->vector domains) (first range)))
+  (define lrange (second range))
   (define delta (map - lrange ldomain))
-  (list delta (second range)))
+  (list (first range) delta))|#
 
 (define (search-ranges ranges domains)
   (for/list ([i ranges])
@@ -68,7 +76,7 @@
 
 ;----------------------------------DECODER------------------------------------------------
 
-(define (get-decoding-domains matrix [nr (sub1 (/ SIZE TL))] [size (* 2 TL)] [step TL])
+(define (get-decoding-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
@@ -86,8 +94,8 @@
 (define (decode founds new-domains)
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds])
-    (define domain (vector-ref new-domains (second i)))
-    (define dc-DCT (map + domain (first i)))
+    (define domain (vector-ref new-domains (first i)))
+    (define dc-DCT (map + domain (second i)))
     (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
