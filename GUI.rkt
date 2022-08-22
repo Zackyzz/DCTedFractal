@@ -98,8 +98,9 @@
         (λ (button event)
           (time
            (when founds
-             (define blocks (decode founds (get-decoding-domains final-matrix)))
-             (set! final-matrix (blocks->image-matrix blocks)))))]))
+             (for ([i 10])
+               (define blocks (decode founds (get-decoding-domains final-matrix)))
+               (set! final-matrix (blocks->image-matrix blocks))))))]))
 
 (define (normalize x bias)
   (set! x (exact-round (+ bias x)))

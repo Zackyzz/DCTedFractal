@@ -30,18 +30,18 @@
 ;----------------------------------ENCODER------------------------------------------------
 
 (define (get-ranges matrix [nr (/ SIZE TL)] [size TL] [step TL])
-  (matrix->list
-   (for/list ([i (in-range 0 (* nr step) step)])
-     (for/list ([j (in-range 0 (* nr step) step)])
-       (list
-        (crop-block
-         (DCT
-          (for/vector ([a (in-range i (+ i size))])
-            (for/vector ([b (in-range j (+ j size))])
-              (matrix-get matrix a b)))))
-        (random 1024))))))
+  (map list
+       (matrix->list
+        (for/list ([i (in-range 0 (* nr step) step)])
+          (for/list ([j (in-range 0 (* nr step) step)])
+            (crop-block
+             (DCT
+              (for/vector ([a (in-range i (+ i size))])
+                (for/vector ([b (in-range j (+ j size))])
+                  (matrix-get matrix a b))))))))
+       (build-list 4096 (λ _ (random 3969)))))
 
-(define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
+(define (get-domains matrix [nr (sub1 (/ SIZE TL))] [size (* 2 TL)] [step TL])
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
@@ -57,10 +57,10 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (define ldomain (list-ref domains (second range)))
+  (define ldomain (vector-ref (list->vector domains) (second range)))
   (define lrange (first range))
   (define delta (map - lrange ldomain))
-  (list (second range) delta))
+  (list delta (second range)))
 
 (define (search-ranges ranges domains)
   (for/list ([i ranges])
@@ -68,7 +68,7 @@
 
 ;----------------------------------DECODER------------------------------------------------
 
-(define (get-decoding-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
+(define (get-decoding-domains matrix [nr (sub1 (/ SIZE TL))] [size (* 2 TL)] [step TL])
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
@@ -86,8 +86,8 @@
 (define (decode founds new-domains)
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds])
-    (define domain (vector-ref new-domains (first i)))
-    (define dc-DCT (map + domain (second i)))
+    (define domain (vector-ref new-domains (second i)))
+    (define dc-DCT (map + domain (first i)))
     (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
