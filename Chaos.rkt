@@ -55,20 +55,16 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (let loop ([error (expt 2 30)] [index 0] [it 0] [delta '()] [domains domains])
+  (let loop ([error (expt 2 30)] [dcerror (expt 2 30)] [1st 0] [2nd 0] [it 0] [Dc 0] [delta '()] [domains domains])
     (cond
-      [(empty? domains) (list index delta)]
+      [(empty? domains) (list 1st 2nd Dc delta)]
       [else
        (define new-error (apply + (map (λ(x y) (abs (- x y))) (cdr range) (cdar domains))))
-       (if (< new-error error)
-           (loop new-error it (add1 it) (map - range (car domains)) (rest domains))
-           (loop error index (add1 it) delta (rest domains)))])))
-
-#|(define (search-range range domains)
-  (define ldomain (vector-ref (list->vector domains) (first range)))
-  (define lrange (second range))
-  (define delta (map - lrange ldomain))
-  (list (first range) delta))|#
+       (define dc-error (abs (- (car range) (caar domains))))
+       (cond
+         [(< new-error error) (loop new-error dcerror it 2nd (add1 it) Dc (map - (cdr range) (cdar domains)) (rest domains))]
+         [(and (> dc-error 16) (< dc-error dcerror)) (loop error dc-error 1st it (add1 it) (- (car range) (caar domains)) delta (rest domains))]
+         [else (loop error dcerror 1st 2nd (add1 it) Dc delta (rest domains))])])))
 
 (define (search-ranges ranges domains)
   (for/list ([i ranges])
@@ -95,8 +91,10 @@
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds])
     (define domain (vector-ref new-domains (first i)))
-    (define dc-DCT (map + domain (second i)))
-    (IDCT (padd-block dc-DCT))))
+    (define second-domain (vector-ref new-domains (second i)))
+    (define DC (+ (third i) (car second-domain)))
+    (define ACs (cons DC (map + (cdr domain) (fourth i))))
+    (IDCT (padd-block ACs))))
 
 (define (blocks->image-matrix blocks)
   (define new-matrix (for/vector ([i SIZE]) (make-vector SIZE)))

@@ -109,6 +109,10 @@
 (define (matrix->bytes matrix)
   (list->bytes (apply append (map (λ(x) (list 255 x x x)) (flatten-matrix matrix)))))
 
+(define (mean m)
+  (define x (flatten-matrix m))
+  (exact->inexact (/ (apply + x) (length x))))
+
 (define finalize-button
   (new button%
        [parent decode-panel]
@@ -140,7 +144,3 @@
        [label "PSNR:"]
        [horiz-margin 150]
        [init-value ""]))
-
-(define (mean m)
-  (define x (flatten-matrix m))
-  (exact->inexact (/ (apply + x) (length x))))
