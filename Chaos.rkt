@@ -5,7 +5,7 @@
 (define SIZE 512)
 (define N-size 16)
 (define TL 8)
-(define S-block 2)
+(define S-block 4)
 (define n (sqr TL))
 
 (define (matrix-get matrix i j)
@@ -34,11 +34,13 @@
   (matrix->list
    (for/list ([i (in-range 0 (* nr step) step)])
      (for/list ([j (in-range 0 (* nr step) step)])
-       (crop-block
-        (DCT
-         (for/vector ([a (in-range i (+ i size))])
-           (for/vector ([b (in-range j (+ j size))])
-             (matrix-get matrix a b)))))))))
+       (list
+        (+ (* 32 (quotient i 16)) (quotient j 16))
+        (crop-block
+         (DCT
+          (for/vector ([a (in-range i (+ i size))])
+            (for/vector ([b (in-range j (+ j size))])
+              (matrix-get matrix a b))))))))))
 
 (define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
   (matrix->list
@@ -56,17 +58,19 @@
                        4)))))))))
 
 (define (search-range range domains)
+  (define dRef (car range))
+  (define ref-domain (drop (list-ref domains dRef) S-block))
+  (set! range (second range))
+  (define dc-delta (map - (drop range S-block) ref-domain))
   (let loop ([error (expt 2 30)] [dcerror (expt 2 30)] [1st 0] [2nd 0] [it 0] [Dc '()] [delta '()] [domains domains])
     (cond
-      [(empty? domains) (list 1st 2nd Dc delta)]
+      [(empty? domains) (list dRef 2nd Dc dc-delta)]
       [else
-       (define new-error (apply + (map (λ(x y) (abs (- x y))) (drop range S-block) (drop (car domains) S-block))))
        (define dc-error
          (if (> (abs (- (first (take range S-block)) (first (take (car domains) S-block)))) 16)
-             (apply + (map (λ(x y) (abs (- x y))) (take range S-block) (take (car domains) S-block)))
+             (apply + (map (λ(x y) (abs (- x y))) (rest (take range S-block)) (rest (take (car domains) S-block))))
              (expt 2 30)))
        (cond
-         [(< new-error error) (loop new-error dcerror it 2nd (add1 it) Dc (map - (drop range S-block) (drop (car domains) S-block)) (rest domains))]
          [(< dc-error dcerror)
           (loop error dc-error 1st it (add1 it) (map - (take range S-block) (take (car domains) S-block)) delta (rest domains))]
          [else (loop error dcerror 1st 2nd (add1 it) Dc delta (rest domains))])])))

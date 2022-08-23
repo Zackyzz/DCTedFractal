@@ -109,7 +109,7 @@
         (λ (button event)
           (time
            (when founds
-             (for ([i 15])
+             (for ([i 25])
                (define blocks (decode founds (get-decoding-domains final-matrix)))
                (set! final-matrix (blocks->image-matrix blocks))
                (define bias (- (mean original-matrix) (mean final-matrix)))
