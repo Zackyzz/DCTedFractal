@@ -55,16 +55,14 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (let loop ([error (expt 2 30)] [dcerror (expt 2 30)] [1st 0] [2nd 0] [it 0] [Dc 0] [delta '()] [domains domains])
+  (let loop ([error (expt 2 30)] [index 0] [it 0] [delta '()] [domains domains])
     (cond
-      [(empty? domains) (list 1st 2nd Dc delta)]
+      [(empty? domains) (list index delta)]
       [else
-       (define new-error (apply + (map (λ(x y) (abs (- x y))) (cdr range) (cdar domains))))
-       (define dc-error (abs (- (car range) (caar domains))))
-       (cond
-         [(< new-error error) (loop new-error dcerror it 2nd (add1 it) Dc (map - (cdr range) (cdar domains)) (rest domains))]
-         [(and (> dc-error 16) (< dc-error dcerror)) (loop error dc-error 1st it (add1 it) (- (car range) (caar domains)) delta (rest domains))]
-         [else (loop error dcerror 1st 2nd (add1 it) Dc delta (rest domains))])])))
+       (define new-error (apply + (map (λ(x y) (abs (- x y))) (take (cdr range) 5) (take (cdar domains) 5))))
+       (if (< new-error error)
+           (loop new-error it (add1 it) (map - range (car domains)) (rest domains))
+           (loop error index (add1 it) delta (rest domains)))])))
 
 (define (search-ranges ranges domains)
   (for/list ([i ranges])
@@ -91,10 +89,8 @@
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds])
     (define domain (vector-ref new-domains (first i)))
-    (define second-domain (vector-ref new-domains (second i)))
-    (define DC (+ (third i) (car second-domain)))
-    (define ACs (cons DC (map + (cdr domain) (fourth i))))
-    (IDCT (padd-block ACs))))
+    (define dc-DCT (map + domain (second i)))
+    (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
   (define new-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
@@ -106,7 +102,7 @@
         (matrix-set new-matrix (+ (* TL row) i) (+ (* TL column) j) (exact-floor (matrix-get block i j))))))
   new-matrix)
 
-;----------------------------------ZIG-ZAG------------------------------------------------
+;----------------------------------ZIG-ZAG SCAN------------------------------------------------
 
 (define/match (compare i j)
   [((list x y) (list a b)) (or (< x a) (and (= x a) (< y b)))])

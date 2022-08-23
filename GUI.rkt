@@ -89,19 +89,6 @@
         (λ (canvas dc)
           (send dc draw-bitmap decode-bitmap 20 20))]))
 
-(define final-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
-(define decode-button
-  (new button%
-       [parent decode-panel]
-       [label "Decode"]
-       [callback
-        (λ (button event)
-          (time
-           (when founds
-             (for ([i 10])
-               (define blocks (decode founds (get-decoding-domains final-matrix)))
-               (set! final-matrix (blocks->image-matrix blocks))))))]))
-
 (define (normalize x [bias 0])
   (set! x (exact-round (+ bias x)))
   (cond [(< x 0) 0] [(> x 255) 255] [else x]))
@@ -113,22 +100,27 @@
   (define x (flatten-matrix m))
   (exact->inexact (/ (apply + x) (length x))))
 
-(define finalize-button
+(define final-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
+(define decode-button
   (new button%
        [parent decode-panel]
-       [label "Finalize"]
+       [label "Decode"]
        [callback
         (λ (button event)
           (time
-           (when final-matrix
-             (define bias (- (mean original-matrix) (mean final-matrix)))
-             (define refinal-matrix
-               (for/vector ([i SIZE])
-                 (for/vector ([j SIZE])
-                   (normalize (matrix-get final-matrix i j) bias))))
-             (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
-             (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
-             (send decode-canvas on-paint))))]))
+           (when founds
+             (for ([i 15])
+               (define blocks (decode founds (get-decoding-domains final-matrix)))
+               (set! final-matrix (blocks->image-matrix blocks))
+               (define bias (- (mean original-matrix) (mean final-matrix)))
+               (define refinal-matrix
+                 (for/vector ([i SIZE])
+                   (for/vector ([j SIZE])
+                     (normalize (matrix-get final-matrix i j) bias))))
+               (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
+               (send mae-field set-value (number->string (MAE original-matrix refinal-matrix)))
+               (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
+               (send decode-canvas on-paint)))))]))
 
 (define (PSNR original decoded)
   (set! original (flatten-matrix original))
@@ -138,9 +130,21 @@
             (apply + (map (λ(x y) (sqr (- x y))) original decoded)))
          10)))
 
+(define (MAE original decoded)
+  (set! original (flatten-matrix original))
+  (set! decoded (flatten-matrix decoded))
+  (/ (apply + (map (λ(x y) (abs (- x y))) original decoded)) (sqr 512.0)))
+
 (define psnr-field
   (new text-field%
        [parent decode-panel]
        [label "PSNR:"]
+       [horiz-margin 150]
+       [init-value ""]))
+
+(define mae-field
+  (new text-field%
+       [parent decode-panel]
+       [label "MAE: "]
        [horiz-margin 150]
        [init-value ""]))
