@@ -50,7 +50,7 @@
        [label "Load file"]
        [callback
         (λ (button event)
-          (define path (get-file #f #f "../Chaos/utils" #f #f null))
+          (define path (get-file #f #f "../FractalDCT/utils" #f #f null))
           (time
            (when path
              (set! encode-bitmap (read-bitmap path))
