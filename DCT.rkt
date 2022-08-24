@@ -30,14 +30,19 @@
 
 (define (transpose m) (lm->mm (apply map list (mm->lm m))))
 
-(define q-table (vector (vector 16 11 10 16 24 40 51 61)
-                        (vector 12 12 14 19 26 58 60 55)
-                        (vector 14 13 16 24 40 57 69 56)
-                        (vector 14 17 22 29 51 87 80 62)
-                        (vector 18 22 37 56 68 109 103 77)
-                        (vector 24 35 55 64 81 104 113 92)
-                        (vector 49 64 78 87 103 121 120 101)
-                        (vector 72 92 95 98 112 100 103 99)))
+(define (quality vec)
+  (vector-map (λ(x) (exact-round (* (- 2 (* 2 0.75)) x))) vec))
+
+(define q-table
+  (vector-map quality
+              (vector (vector 16 11 10 16 24 40 51 61)
+                      (vector 12 12 14 19 26 58 60 55)
+                      (vector 14 13 16 24 40 57 69 56)
+                      (vector 14 17 22 29 51 87 80 62)
+                      (vector 18 22 37 56 68 109 103 77)
+                      (vector 24 35 55 64 81 104 113 92)
+                      (vector 49 64 78 87 103 121 120 101)
+                      (vector 72 92 95 98 112 100 103 99))))
 
 (define (quantize block)
   (for/vector ([i 8])
