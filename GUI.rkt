@@ -106,7 +106,7 @@
   (define delta (- bias (mean block)))
   (for/vector ([i 8])
     (for/vector ([j 8])
-      (+ delta (matrix-get block i j)))))
+      (exact-round (+ delta (matrix-get block i j))))))
   
 (define final-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
 (define decode-button
@@ -118,8 +118,10 @@
           (time
            (when founds
              (for ([i 10])
-               (define blocks (decode founds (get-decoding-domains final-matrix)))
-               (set! blocks (for/list ([i DCs] [j blocks]) (debiasing j i)))
+               (define blocks
+                 (decode founds (get-decoding-domains final-matrix)
+                         (map (λ(x) (exact-round (/ (- (* 64 x) (* 64 128)) (* 8.0 16)))) DCs)))
+               (set! blocks (for/list ([i blocks] [j DCs]) (debiasing i j)))
                (set! final-matrix (blocks->image-matrix blocks))
                (define refinal-matrix
                  (for/vector ([i SIZE])

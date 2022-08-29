@@ -62,7 +62,7 @@
       [else
        (define new-error (apply + (map (λ(x y) (abs (- x y))) (take (cdr range) S-block) (take (cdar domains) S-block))))
        (if (< new-error error)
-           (loop new-error it (add1 it) (map - range (car domains)) (rest domains))
+           (loop new-error it (add1 it) (map - (cdr range) (cdar domains)) (rest domains))
            (loop error index (add1 it) delta (rest domains)))])))
 
 (define (search-ranges ranges domains)
@@ -86,11 +86,11 @@
                            (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
                        4)))))))))
 
-(define (decode founds new-domains)
+(define (decode founds new-domains DCs)
   (set! new-domains (list->vector new-domains))
-  (for/list ([i founds])
-    (define domain (vector-ref new-domains (first i)))
-    (define dc-DCT (map + domain (second i)))
+  (for/list ([i founds] [DC DCs])
+    (define domain (cdr (vector-ref new-domains (first i))))
+    (define dc-DCT (cons DC (map + domain (second i))))
     (IDCT (padd-block dc-DCT))))
 
 (define (blocks->image-matrix blocks)
