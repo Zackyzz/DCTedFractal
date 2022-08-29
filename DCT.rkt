@@ -31,7 +31,7 @@
 (define (transpose m) (lm->mm (apply map list (mm->lm m))))
 
 (define (quality vec)
-  (vector-map (λ(x) (exact-round (* (- 2 (* 2 0.75)) x))) vec))
+  (vector-map (λ(x) (exact-round (* (- 2 (* 2 0.5)) x))) vec))
 
 (define q-table
   (vector-map quality

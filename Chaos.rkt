@@ -4,7 +4,7 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 5)
+(define S-block 7)
 (define TL 8)
 (define n (sqr TL))
 

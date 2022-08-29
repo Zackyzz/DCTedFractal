@@ -41,6 +41,7 @@
 
 (define ranges #f)
 (define domains #f)
+(define DCs #f)
 (define encode-buffer (make-bytes (* SIZE SIZE 4)))
 (define original-matrix #f)
 
@@ -58,7 +59,8 @@
              (send encode-bitmap get-argb-pixels 0 0 SIZE SIZE encode-buffer)
              (set! original-matrix (get-matrix encode-buffer))
              (set! ranges (get-ranges original-matrix))
-             (set! domains (get-domains original-matrix)))))]))
+             (set! domains (get-domains original-matrix))
+             (set! DCs (map mean (get-blocks original-matrix))))))]))
 
 (define founds #f)
 (define process-button
@@ -100,6 +102,12 @@
   (define x (flatten-matrix m))
   (exact->inexact (/ (apply + x) (length x))))
 
+(define (debiasing block bias)
+  (define delta (- bias (mean block)))
+  (for/vector ([i 8])
+    (for/vector ([j 8])
+      (+ delta (matrix-get block i j)))))
+  
 (define final-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
 (define decode-button
   (new button%
@@ -109,14 +117,14 @@
         (λ (button event)
           (time
            (when founds
-             (for ([i 25])
+             (for ([i 10])
                (define blocks (decode founds (get-decoding-domains final-matrix)))
+               (set! blocks (for/list ([i DCs] [j blocks]) (debiasing j i)))
                (set! final-matrix (blocks->image-matrix blocks))
-               (define bias (- (mean original-matrix) (mean final-matrix)))
                (define refinal-matrix
                  (for/vector ([i SIZE])
                    (for/vector ([j SIZE])
-                     (normalize (matrix-get final-matrix i j) bias))))
+                     (normalize (matrix-get final-matrix i j)))))
                (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
                (send mae-field set-value (number->string (MAE original-matrix refinal-matrix)))
                (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
