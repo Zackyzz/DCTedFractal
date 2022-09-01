@@ -1,18 +1,11 @@
 #lang racket/gui
 (require "Chaos.rkt")
 
-(define (get-matrix buffer)
-  (for/vector ([i SIZE])
-    (for/vector ([j (in-range (add1 (* i 4 SIZE)) (add1 (* (add1 i) 4 SIZE)) 4)])
-      (bytes-ref buffer j))))
-
-;------------------------------------GUI----------------------------------------
-
 (define frame
   (new frame%
        [label "Fractal Coding"]
        [x 250] [y 150]
-       [width 1150] [height 670]))
+       [width 1150] [height 650]))
 
 (send frame show #t)
 
@@ -42,6 +35,7 @@
 (define ranges #f)
 (define domains #f)
 (define DCs #f)
+(define means #f)
 (define encode-buffer (make-bytes (* SIZE SIZE 4)))
 (define original-matrix #f)
 
@@ -60,7 +54,8 @@
              (set! original-matrix (get-matrix encode-buffer))
              (set! ranges (get-ranges original-matrix))
              (set! domains (get-domains original-matrix))
-             (set! DCs (map mean (get-blocks original-matrix))))))]))
+             (set! DCs (map first ranges))
+             (set! means (map mean (get-blocks original-matrix))))))]))
 
 (define founds #f)
 (define process-button
@@ -90,23 +85,6 @@
        [paint-callback
         (λ (canvas dc)
           (send dc draw-bitmap decode-bitmap 20 20))]))
-
-(define (normalize x [bias 0])
-  (set! x (exact-round (+ bias x)))
-  (cond [(< x 0) 0] [(> x 255) 255] [else x]))
-
-(define (matrix->bytes matrix)
-  (list->bytes (apply append (map (λ(x) (list 255 x x x)) (flatten-matrix matrix)))))
-
-(define (mean m)
-  (define x (flatten-matrix m))
-  (exact->inexact (/ (apply + x) (length x))))
-
-(define (debiasing block bias)
-  (define delta (- bias (mean block)))
-  (for/vector ([i 8])
-    (for/vector ([j 8])
-      (exact-round (+ delta (matrix-get block i j))))))
   
 (define final-matrix (for/vector ([i SIZE]) (make-vector SIZE)))
 (define decode-button
@@ -118,43 +96,16 @@
           (time
            (when founds
              (for ([i 10])
-               (define blocks
-                 (decode founds (get-decoding-domains final-matrix)
-                         (map (λ(x) (exact-round (/ (- (* 64 x) (* 64 128)) (* 8.0 16)))) DCs)))
-               (set! blocks (for/list ([i blocks] [j DCs]) (debiasing i j)))
+               (define blocks (decode founds (get-decoding-domains final-matrix) DCs))
+               (set! blocks (for/list ([i blocks] [j means]) (debiasing i j)))
                (set! final-matrix (blocks->image-matrix blocks))
-               (define refinal-matrix
-                 (for/vector ([i SIZE])
-                   (for/vector ([j SIZE])
-                     (normalize (matrix-get final-matrix i j)))))
-               (send psnr-field set-value (number->string (PSNR original-matrix refinal-matrix)))
-               (send mae-field set-value (number->string (MAE original-matrix refinal-matrix)))
-               (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes refinal-matrix))
+               (send psnr-field set-value (number->string (PSNR original-matrix final-matrix)))
+               (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes final-matrix))
                (send decode-canvas on-paint)))))]))
-
-(define (PSNR original decoded)
-  (set! original (flatten-matrix original))
-  (set! decoded (flatten-matrix decoded))
-  (* 10 (log
-         (/ (* SIZE SIZE (sqr (apply max original)))
-            (apply + (map (λ(x y) (sqr (- x y))) original decoded)))
-         10)))
-
-(define (MAE original decoded)
-  (set! original (flatten-matrix original))
-  (set! decoded (flatten-matrix decoded))
-  (/ (apply + (map (λ(x y) (abs (- x y))) original decoded)) (sqr 512.0)))
 
 (define psnr-field
   (new text-field%
        [parent decode-panel]
        [label "PSNR:"]
-       [horiz-margin 150]
-       [init-value ""]))
-
-(define mae-field
-  (new text-field%
-       [parent decode-panel]
-       [label "MAE: "]
        [horiz-margin 150]
        [init-value ""]))

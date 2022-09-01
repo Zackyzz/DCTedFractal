@@ -1,14 +1,12 @@
 #lang racket
 (provide DCT IDCT)
 
-(define (shift- vec)
-  (vector-map (λ(x) (- x 128)) vec))
-
-(define (shift+ vec)
-  (vector-map (λ(x) (+ (exact-round x) 128)) vec))
-
-(define (matrix-get matrix i j)
-  (vector-ref (vector-ref matrix i) j))
+(define (shift- vec) (vector-map (λ(x) (- x 128)) vec))
+(define (shift+ vec) (vector-map (λ(x) (+ (exact-round x) 128)) vec))
+(define (matrix-get matrix i j) (vector-ref (vector-ref matrix i) j))
+(define (transpose m) (lm->mm (apply map list (mm->lm m))))
+(define (lm->mm m) (list->vector (map list->vector m)))
+(define (mm->lm m) (vector->list (vector-map vector->list m)))
 
 (define T
   (for/vector ([i 8])
@@ -16,9 +14,6 @@
       (if (= i 0)
           (/ 1.0 (sqrt 8))
           (* 0.5 (cos (/ (* (+ 1 (* 2 j)) i pi) 16)))))))
-
-(define (lm->mm m) (list->vector (map list->vector m)))
-(define (mm->lm m) (vector->list (vector-map vector->list m)))
 
 (define (mult m1 m2)
   (set! m1 (mm->lm m1))
@@ -28,13 +23,10 @@
      (for/list ([c (apply map list m2)])
        (apply + (map * r c))))))
 
-(define (transpose m) (lm->mm (apply map list (mm->lm m))))
-
-(define (quality vec)
-  (vector-map (λ(x) (exact-round (* (- 2 (* 2 0.5)) x))) vec))
+(define (quality-factor vec) (vector-map (λ(x) (exact-round (* (- 2 (* 2 0.5)) x))) vec))
 
 (define q-table
-  (vector-map quality
+  (vector-map quality-factor
               (vector (vector 16 11 10 16 24 40 51 61)
                       (vector 12 12 14 19 26 58 60 55)
                       (vector 14 13 16 24 40 57 69 56)
