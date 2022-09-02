@@ -96,7 +96,7 @@
           (time
            (when founds
              (for ([i 10])
-               (define blocks (decode founds (get-decoding-domains final-matrix) DCs))
+               (define blocks (decode founds (get-domains final-matrix) DCs))
                (set! blocks (for/list ([i blocks] [j means]) (debiasing i j)))
                (set! final-matrix (blocks->image-matrix blocks))
                (send psnr-field set-value (number->string (PSNR original-matrix final-matrix)))

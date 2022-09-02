@@ -4,7 +4,7 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 7)
+(define S-block 2)
 (define TL 8)
 (define n (sqr TL))
 
@@ -87,20 +87,38 @@
            (for/vector ([b (in-range j (+ j size))])
              (matrix-get matrix a b)))))))))
 
+(define (make-isometry matrix iso [size 8])
+  (for/vector ([i size])
+    (for/vector ([j size])
+      (cond
+        [(= iso 0) (matrix-get matrix i j)]
+        [(= iso 1) (matrix-get matrix i (- size 1 j))]
+        [(= iso 2) (matrix-get matrix (- size 1 i) j)]
+        [(= iso 3) (matrix-get matrix (- size 1 j) (- size 1 i))]
+        [(= iso 4) (matrix-get matrix j i)]
+        [(= iso 5) (matrix-get matrix (- size 1 j) i)]
+        [(= iso 6) (matrix-get matrix (- size 1 i) (- size 1 j))]
+        [(= iso 7) (matrix-get matrix j (- size 1 i))]))))
+
 (define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
-  (matrix->list
-   (for/list ([i (in-range 0 (* nr step) step)])
-     (for/list ([j (in-range 0 (* nr step) step)])
-       (crop-block
-        (DCT
-         (for/vector ([a (in-range TL)])
-           (for/vector ([b (in-range TL)])
-             (quotient (exact-round
-                        (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
-                           (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
-                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
-                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
-                       4)))))))))
+  (apply
+   append
+   (matrix->list
+    (for/list ([i (in-range 0 (* nr step) step)])
+      (for/list ([j (in-range 0 (* nr step) step)])
+        (for/list ([i 8])
+          (crop-block
+           (DCT
+            (make-isometry
+             (for/vector ([a (in-range TL)])
+               (for/vector ([b (in-range TL)])
+                 (quotient (exact-round
+                            (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
+                               (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
+                               (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
+                               (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
+                           4)))
+             i)))))))))
 
 (define (search-range range domains)
   (let loop ([error (expt 2 30)] [index 0] [it 0] [delta '()] [domains domains])
@@ -115,21 +133,6 @@
 (define (search-ranges ranges domains) (for/list ([i ranges]) (search-range i domains)))
 
 ;----------------------------------DECODER------------------------------------------------
-
-(define (get-decoding-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
-  (matrix->list
-   (for/list ([i (in-range 0 (* nr step) step)])
-     (for/list ([j (in-range 0 (* nr step) step)])
-       (crop-block
-        (DCT
-         (for/vector ([a (in-range TL)])
-           (for/vector ([b (in-range TL)])
-             (quotient (exact-round
-                        (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
-                           (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
-                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
-                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
-                       4)))))))))
 
 (define (decode founds new-domains DCs)
   (set! new-domains (list->vector new-domains))
