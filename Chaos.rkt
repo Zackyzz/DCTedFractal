@@ -4,7 +4,7 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 2)
+(define S-block 10)
 (define TL 8)
 (define n (sqr TL))
 
@@ -14,7 +14,7 @@
 
 (define (matrix-get matrix i j) (vector-ref (vector-ref matrix i) j))
 (define (matrix-set matrix i j val) (vector-set! (vector-ref matrix i) j val))
-(define (flatten-matrix matrix)  (vector->list (apply vector-append (vector->list matrix))))
+(define (flatten-matrix matrix) (vector->list (apply vector-append (vector->list matrix))))
 (define (matrix->list matrix) (apply append matrix))
 
 (define (get-matrix buffer)
@@ -121,22 +121,30 @@
              i)))))))))
 
 (define (search-range range domains)
-  (let loop ([error (expt 2 30)] [index 0] [it 0] [delta '()] [domains domains])
+  (let loop ([1st-error (expt 2 30)] [2nd-error (expt 2 30)] [1st-index 0] [2nd-index 0] [it 0] [1st-delta '()] [2nd-delta '()] [domains domains])
     (cond
-      [(empty? domains) (list index delta)]
+      [(empty? domains) (list 1st-index 2nd-index 1st-delta 2nd-delta)]
       [else
-       (define new-error (apply + (map (λ(x y) (abs (- x y))) (take (cdr range) S-block) (take (cdar domains) S-block))))
-       (if (< new-error error)
-           (loop new-error it (add1 it) (map - (cdr range) (cdar domains)) (rest domains))
-           (loop error index (add1 it) delta (rest domains)))])))
-
+       (define ac-range (cdr range))
+       (define domain (cdar domains))
+       (define range1 (append (take ac-range 2) (drop ac-range (+ 2 S-block))))
+       (define range2 (take (drop ac-range 2) S-block))
+       (define domain1 (append (take domain 2) (drop domain (+ 2 S-block))))
+       (define domain2 (take (drop domain 2) S-block))
+       (define new-1st-error (apply + (map (λ(x y) (abs (- x y))) range1 domain1)))
+       (define new-2nd-error (apply + (map (λ(x y) (abs (- x y))) range2 domain2)))
+       (cond
+         [(< new-1st-error 1st-error) (loop new-1st-error 2nd-error it 2nd-index (add1 it) (map - range1 domain1) 2nd-delta (rest domains))]
+         [(< new-2nd-error 2nd-error) (loop 1st-error new-2nd-error 1st-index it (add1 it) 1st-delta (map - range2 domain2) (rest domains))]
+         [else (loop 1st-error 2nd-error 1st-index 2nd-index (add1 it) 1st-delta 2nd-delta (rest domains))])])))
+ 
 (define (search-ranges ranges domains) (for/list ([i ranges]) (search-range i domains)))
-
-;----------------------------------DECODER------------------------------------------------
 
 (define (decode founds new-domains DCs)
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds] [DC DCs])
-    (define domain (cdr (vector-ref new-domains (first i))))
-    (define dc-DCT (cons DC (map + domain (second i))))
+    (define domain1 (cdr (vector-ref new-domains (first i))))
+    (define 1st-deltaed (map + (append (take domain1 2) (drop domain1 (+ 2 S-block))) (third i)))
+    (define 2nd-deltaed (map + (take (drop (vector-ref new-domains (second i)) 3) S-block) (fourth i)))
+    (define dc-DCT (cons DC (append (take 1st-deltaed 2) 2nd-deltaed (drop 1st-deltaed 2))))
     (IDCT (padd-block dc-DCT))))
