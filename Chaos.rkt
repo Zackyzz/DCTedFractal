@@ -4,7 +4,8 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 10)
+(define S-block 9)
+(define AC-size 2)
 (define TL 8)
 (define n (sqr TL))
 
@@ -87,38 +88,20 @@
            (for/vector ([b (in-range j (+ j size))])
              (matrix-get matrix a b)))))))))
 
-(define (make-isometry matrix iso [size 8])
-  (for/vector ([i size])
-    (for/vector ([j size])
-      (cond
-        [(= iso 0) (matrix-get matrix i j)]
-        [(= iso 1) (matrix-get matrix i (- size 1 j))]
-        [(= iso 2) (matrix-get matrix (- size 1 i) j)]
-        [(= iso 3) (matrix-get matrix (- size 1 j) (- size 1 i))]
-        [(= iso 4) (matrix-get matrix j i)]
-        [(= iso 5) (matrix-get matrix (- size 1 j) i)]
-        [(= iso 6) (matrix-get matrix (- size 1 i) (- size 1 j))]
-        [(= iso 7) (matrix-get matrix j (- size 1 i))]))))
-
 (define (get-domains matrix [nr (/ SIZE (* 2 TL))] [size (* 2 TL)] [step (* 2 TL)])
-  (apply
-   append
-   (matrix->list
-    (for/list ([i (in-range 0 (* nr step) step)])
-      (for/list ([j (in-range 0 (* nr step) step)])
-        (for/list ([i 8])
-          (crop-block
-           (DCT
-            (make-isometry
-             (for/vector ([a (in-range TL)])
-               (for/vector ([b (in-range TL)])
-                 (quotient (exact-round
-                            (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
-                               (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
-                               (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
-                               (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
-                           4)))
-             i)))))))))
+  (matrix->list
+   (for/list ([i (in-range 0 (* nr step) step)])
+     (for/list ([j (in-range 0 (* nr step) step)])
+       (crop-block
+        (DCT
+         (for/vector ([a (in-range TL)])
+           (for/vector ([b (in-range TL)])
+             (quotient (exact-round
+                        (+ (matrix-get matrix (+ i (* 2 a)) (+ j (* 2 b)))
+                           (matrix-get matrix (+ i (* 2 a)) (+ j (+ 1 (* 2 b))))
+                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (* 2 b)))
+                           (matrix-get matrix (+ i (+ 1 (* 2 a))) (+ j (+ 1 (* 2 b))))))
+                       4)))))))))
 
 (define (search-range range domains)
   (let loop ([1st-error (expt 2 30)] [2nd-error (expt 2 30)] [1st-index 0] [2nd-index 0] [it 0] [1st-delta '()] [2nd-delta '()] [domains domains])
@@ -127,10 +110,10 @@
       [else
        (define ac-range (cdr range))
        (define domain (cdar domains))
-       (define range1 (append (take ac-range 2) (drop ac-range (+ 2 S-block))))
-       (define range2 (take (drop ac-range 2) S-block))
-       (define domain1 (append (take domain 2) (drop domain (+ 2 S-block))))
-       (define domain2 (take (drop domain 2) S-block))
+       (define range1 (append (take ac-range AC-size) (drop ac-range (+ AC-size S-block))))
+       (define range2 (take (drop ac-range AC-size) S-block))
+       (define domain1 (append (take domain AC-size) (drop domain (+ AC-size S-block))))
+       (define domain2 (take (drop domain AC-size) S-block))
        (define new-1st-error (apply + (map (λ(x y) (abs (- x y))) range1 domain1)))
        (define new-2nd-error (apply + (map (λ(x y) (abs (- x y))) range2 domain2)))
        (cond
@@ -144,7 +127,7 @@
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds] [DC DCs])
     (define domain1 (cdr (vector-ref new-domains (first i))))
-    (define 1st-deltaed (map + (append (take domain1 2) (drop domain1 (+ 2 S-block))) (third i)))
-    (define 2nd-deltaed (map + (take (drop (vector-ref new-domains (second i)) 3) S-block) (fourth i)))
-    (define dc-DCT (cons DC (append (take 1st-deltaed 2) 2nd-deltaed (drop 1st-deltaed 2))))
+    (define 1st-deltaed (map + (append (take domain1 AC-size) (drop domain1 (+ AC-size S-block))) (third i)))
+    (define 2nd-deltaed (map + (take (drop (vector-ref new-domains (second i)) (+ 1 AC-size)) S-block) (fourth i)))
+    (define dc-DCT (cons DC (append (take 1st-deltaed AC-size) 2nd-deltaed (drop 1st-deltaed AC-size))))
     (IDCT (padd-block dc-DCT))))
