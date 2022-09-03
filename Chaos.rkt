@@ -4,8 +4,7 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 9)
-(define AC-size 2)
+(define S-block 7)
 (define TL 8)
 (define n (sqr TL))
 
@@ -104,30 +103,22 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (let loop ([1st-error (expt 2 30)] [2nd-error (expt 2 30)] [1st-index 0] [2nd-index 0] [it 0] [1st-delta '()] [2nd-delta '()] [domains domains])
+  (let loop ([1st-error (expt 2 30)] [1st-index 0] [it 0] [1st-delta '()] [domains domains])
     (cond
-      [(empty? domains) (list 1st-index 2nd-index 1st-delta 2nd-delta)]
+      [(empty? domains) (list 1st-index 1st-delta)]
       [else
        (define ac-range (cdr range))
        (define domain (cdar domains))
-       (define range1 (append (take ac-range AC-size) (drop ac-range (+ AC-size S-block))))
-       (define range2 (take (drop ac-range AC-size) S-block))
-       (define domain1 (append (take domain AC-size) (drop domain (+ AC-size S-block))))
-       (define domain2 (take (drop domain AC-size) S-block))
-       (define new-1st-error (apply + (map (λ(x y) (abs (- x y))) range1 domain1)))
-       (define new-2nd-error (apply + (map (λ(x y) (abs (- x y))) range2 domain2)))
+       (define new-1st-error (apply + (map (λ(x y) (abs (- x y))) (take ac-range S-block) (take domain S-block))))
        (cond
-         [(< new-1st-error 1st-error) (loop new-1st-error 2nd-error it 2nd-index (add1 it) (map - range1 domain1) 2nd-delta (rest domains))]
-         [(< new-2nd-error 2nd-error) (loop 1st-error new-2nd-error 1st-index it (add1 it) 1st-delta (map - range2 domain2) (rest domains))]
-         [else (loop 1st-error 2nd-error 1st-index 2nd-index (add1 it) 1st-delta 2nd-delta (rest domains))])])))
+         [(< new-1st-error 1st-error) (loop new-1st-error it (add1 it) (map - ac-range domain) (rest domains))]
+         [else (loop 1st-error 1st-index (add1 it) 1st-delta (rest domains))])])))
  
 (define (search-ranges ranges domains) (for/list ([i ranges]) (search-range i domains)))
 
 (define (decode founds new-domains DCs)
   (set! new-domains (list->vector new-domains))
   (for/list ([i founds] [DC DCs])
-    (define domain1 (cdr (vector-ref new-domains (first i))))
-    (define 1st-deltaed (map + (append (take domain1 AC-size) (drop domain1 (+ AC-size S-block))) (third i)))
-    (define 2nd-deltaed (map + (take (drop (vector-ref new-domains (second i)) (+ 1 AC-size)) S-block) (fourth i)))
-    (define dc-DCT (cons DC (append (take 1st-deltaed AC-size) 2nd-deltaed (drop 1st-deltaed AC-size))))
+    (define domain (cdr (vector-ref new-domains (first i))))
+    (define dc-DCT (cons DC (map + domain (second i))))
     (IDCT (padd-block dc-DCT))))
