@@ -1,11 +1,11 @@
 #lang racket/gui
-(require "Chaos.rkt" "AC.rkt")
+(require "Chaos.rkt")
 
 (define frame
   (new frame%
        [label "Fractal Coding"]
        [x 250] [y 150]
-       [width 1150] [height 660]))
+       [width 1150] [height 650]))
 
 (send frame show #t)
 
@@ -109,14 +109,3 @@
        [label "PSNR:"]
        [horiz-margin 150]
        [init-value ""]))
-
-(define encode-button
-  (new button%
-       [parent decode-panel]
-       [label "Encode"]
-       [callback
-        (λ (button event)
-          (time
-           (when founds
-             (define ACs (apply append (map second founds)))
-             (arithmetic-encode ACs "test.dctf"))))]))
