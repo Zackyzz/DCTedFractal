@@ -34,8 +34,6 @@
 
 (define ranges #f)
 (define domains #f)
-(define DCs #f)
-(define means #f)
 (define encode-buffer (make-bytes (* SIZE SIZE 4)))
 (define original-matrix #f)
 
@@ -53,9 +51,7 @@
              (send encode-bitmap get-argb-pixels 0 0 SIZE SIZE encode-buffer)
              (set! original-matrix (get-matrix encode-buffer))
              (set! ranges (get-ranges original-matrix))
-             (set! domains (get-domains original-matrix))
-             (set! DCs (map first ranges))
-             (set! means (map mean (get-blocks original-matrix))))))]))
+             (set! domains (get-domains original-matrix)))))]))
 
 (define founds #f)
 (define process-button
@@ -65,7 +61,14 @@
        [callback
         (λ (button event)
           (when (and ranges domains)
-            (time (set! founds (search-ranges ranges domains)))))]))
+            (time (set! founds (search-ranges ranges domains)))
+            (for ([i 50])
+              (printf "~a ~a ~a\n"
+                      i
+                      (+ (length (filter (λ(x) (= i x)) (apply append (map second founds))))
+                      (length (filter (λ(x) (= (- i) x)) (apply append (map second founds)))))
+                      (+ (length (filter (λ(x) (= i x)) (apply append ranges)))
+                      (length (filter (λ(x) (= (- i) x)) (apply append ranges))))))))]))
                    
 ;------------------------------------DECODE PANEL----------------------------------------
 
@@ -95,10 +98,13 @@
         (λ (button event)
           (time
            (when founds
-             (for ([i 10])
-               (define blocks (decode founds (get-domains final-matrix) DCs))
-               (set! blocks (for/list ([i blocks] [j means]) (debiasing i j)))
+             (for ([i 25])
+               (define blocks (decode founds (get-domains final-matrix)))
                (set! final-matrix (blocks->image-matrix blocks))
+               (set! final-matrix
+                     (for/vector ([i 512])
+                       (for/vector ([j 512])
+                         (normalize (matrix-get final-matrix i j)))))
                (send psnr-field set-value (number->string (PSNR original-matrix final-matrix)))
                (send decode-bitmap set-argb-pixels 0 0 SIZE SIZE (matrix->bytes final-matrix))
                (send decode-canvas on-paint)))))]))

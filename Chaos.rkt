@@ -4,7 +4,7 @@
 
 (define SIZE 512)
 (define N-size 32)
-(define S-block 7)
+(define S-block 16)
 (define TL 8)
 (define n (sqr TL))
 
@@ -103,22 +103,26 @@
                        4)))))))))
 
 (define (search-range range domains)
-  (let loop ([1st-error (expt 2 30)] [1st-index 0] [it 0] [1st-delta '()] [domains domains])
+  (let loop ([1st-error (expt 2 62)] [1st-index 0] [it 0] [1st-delta '()] [S 0] [domains domains])
     (cond
-      [(empty? domains) (list 1st-index 1st-delta)]
+      [(empty? domains) (list 1st-index 1st-delta S)]
       [else
-       (define ac-range (cdr range))
-       (define domain (cdar domains))
-       (define new-1st-error (apply + (map (λ(x y) (abs (- x y))) (take ac-range S-block) (take domain S-block))))
+       (define domain (car domains))
+       (define ri^2 (apply + (map sqr (take range S-block))))
+       (define s (if (= 0 ri^2) 0 (/ (apply + (map * (take range S-block) (take domain S-block))) ri^2)))
+       (set! s (if (>= s 0) 1.25 -1.25))
+       (define s-range (map (λ(x) (* x s)) range))
+       (define new-1st-error (apply + (map (λ(x y) (expt (- x y) 4)) (take s-range S-block) (take domain S-block))))
        (cond
-         [(< new-1st-error 1st-error) (loop new-1st-error it (add1 it) (map - ac-range domain) (rest domains))]
-         [else (loop 1st-error 1st-index (add1 it) 1st-delta (rest domains))])])))
+         [(< new-1st-error 1st-error) (loop new-1st-error it (add1 it) (map (λ(x y) (exact-round (- x y))) s-range domain) s (rest domains))]
+         [else (loop 1st-error 1st-index (add1 it) 1st-delta S (rest domains))])])))
  
 (define (search-ranges ranges domains) (for/list ([i ranges]) (search-range i domains)))
 
-(define (decode founds new-domains DCs)
+(define (decode founds new-domains)
   (set! new-domains (list->vector new-domains))
-  (for/list ([i founds] [DC DCs])
-    (define domain (cdr (vector-ref new-domains (first i))))
-    (define dc-DCT (cons DC (map + domain (second i))))
+  (for/list ([i founds])
+    (define domain (vector-ref new-domains (first i)))
+    (define s (third i))
+    (define dc-DCT (map (λ(x) (/ x s)) (map + domain (second i))))
     (IDCT (padd-block dc-DCT))))
